@@ -14,9 +14,9 @@ This action currently supports these versions of MRI, JRuby and TruffleRuby:
 
 | Interpreter | Versions |
 | ----------- | -------- |
-| `ruby` | 2.1.9, 2.2, 2.3.0 - 2.3.8, 2.4.0 - 2.4.10, 2.5.0 - 2.5.8, 2.6.0 - 2.6.6, 2.7.2, 3.0.0, head, debug, mingw, mswin |
-| `jruby` | 9.1.17.0, 9.2.9.0 - 9.2.13.0, head |
-| `truffleruby` | 19.3.0 - 21.0.0, head |
+| `ruby` | 2.0.0, 2.1.9, 2.2, all versions from 2.3.0 until 3.0.2, head, debug, mingw, mswin |
+| `jruby` | 9.1.17.0, 9.2.9.0 - 9.2.19.0, head |
+| `truffleruby` | 19.3.0 - 21.1.0, head |
 
 `ruby-debug` is the same as `ruby-head` but with assertions enabled (`-DRUBY_DEBUG=1`).  
 On Windows, `mingw` and `mswin` are `ruby-head` builds using the MSYS2/MinGW and the MSVC toolchains respectively.
@@ -38,7 +38,7 @@ The action works for all [GitHub-hosted runners](https://help.github.com/en/acti
 
 | Operating System | Recommended | Other Supported Versions |
 | ----------- | -------- | -------- |
-| Ubuntu  | `ubuntu-latest`  (= `ubuntu-18.04`) | `ubuntu-20.04`, `ubuntu-16.04` |
+| Ubuntu  | `ubuntu-latest`  (= `ubuntu-20.04`) | `ubuntu-18.04`, `ubuntu-16.04` |
 | macOS   | `macos-latest`   (= `macos-10.15`)  | `macos-11.0` |
 | Windows | `windows-latest` (= `windows-2019`) | `windows-2016` |
 
@@ -83,6 +83,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
+        # Due to https://github.com/actions/runner/issues/849, we have to use quotes for '3.0'
         ruby: [2.5, 2.6, 2.7, '3.0', head, jruby, jruby-head, truffleruby, truffleruby-head]
     runs-on: ${{ matrix.os }}
     steps:
@@ -110,7 +111,7 @@ jobs:
       BUNDLE_GEMFILE: gemfiles/${{ matrix.gemfile }}.gemfile
     steps:
       - uses: actions/checkout@v2
-      - uses: ./
+      - uses: ruby/setup-ruby@v1
         with:
           ruby-version: 2.6
           bundler-cache: true # runs 'bundle install' and caches installed gems automatically
@@ -166,8 +167,9 @@ as shown in the [example](#matrix-of-gemfiles).
 
 When using `bundler-cache: true` you might notice there is no good place to run `bundle config ...` commands.
 These can be replaced by `BUNDLE_*` environment variables, which are also faster.
-They should be set the `env` at the job level as shown in the [example](#matrix-of-gemfiles).
-See the [Bundler docs](https://bundler.io/man/bundle-config.1.html) or look at `.bundle/config` locally for the environment variable names,
+They should be set in the `env` at the job level as shown in the [example](#matrix-of-gemfiles).
+To find the correct the environment variable name, see the [Bundler docs](https://bundler.io/man/bundle-config.1.html) or look at `.bundle/config` after running `bundle config --local KEY VALUE` locally.
+You might need to `"`-quote the environment variable name in YAML if it has unusual characters like `/`.
 
 To perform caching, this action will use `bundle config --local path $PWD/vendor/bundle`.  
 Therefore, the Bundler `path` should not be changed in your workflow for the cache to work (no `bundle config path`).
@@ -177,6 +179,20 @@ Therefore, the Bundler `path` should not be changed in your workflow for the cac
 When there is no lockfile, one is generated with `bundle lock`, which is the same as `bundle install` would do first before actually fetching any gem.
 In other words, it works exactly like `bundle install`.
 The hash of the generated lockfile is then used for caching, which is the only correct approach.
+
+#### Dealing with a corrupted cache
+
+In some rare scenarios (like using gems with C extensions whose functionality depends on libraries found on the system
+at the time of the gem's build) it may be necessary to ignore contents of the cache and get and build all the gems anew.
+In order to achieve this, set the `cache-version` option to any value other than `0` (or change it to a new unique value
+if you have already used it before.)
+
+```yaml
+    - uses: ruby/setup-ruby@v1
+      with:
+        bundler-cache: true
+        cache-version: 1
+```
 
 #### Caching `bundle install` manually
 
@@ -214,7 +230,7 @@ This action might work with [self-hosted runners](https://docs.github.com/en/act
 if the [virtual environment](https://github.com/actions/virtual-environments) is very similar to the ones used by GitHub runners. Notably:
 
 * Make sure to use the same operating system and version.
-* Set the environment variable `ImageOS` to the corresponding value on GitHub-hosted runners (e.g. `ubuntu18`/`macos1015`/`win19`). This is necessary to detect the operating system and version.
+* Set the environment variable `ImageOS` on the runner to the corresponding value on GitHub-hosted runners (e.g. `ubuntu18`/`macos1015`/`win19`). This is necessary to detect the operating system and version.
 * Make sure to use the same version of libssl.
 * Make sure that the operating system has `libyaml-0` installed
 * The default tool cache directory (`/opt/hostedtoolcache` on Linux, `/Users/runner/hostedtoolcache` on macOS,

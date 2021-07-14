@@ -12,6 +12,7 @@ const inputDefaults = {
   'bundler': 'default',
   'bundler-cache': 'true',
   'working-directory': '.',
+  'cache-version': bundler.DEFAULT_CACHE_VERSION,
 }
 
 // entry point when this action is run on its own
@@ -67,7 +68,7 @@ export async function setupRuby(options = {}) {
 
     if (inputs['bundler-cache'] === 'true') {
       await common.measure('bundle install', async () =>
-          bundler.bundleInstall(gemfile, lockFile, platform, engine, version, bundlerVersion))
+          bundler.bundleInstall(gemfile, lockFile, platform, engine, version, bundlerVersion, inputs['cache-version']))
     }
   }
 
@@ -129,6 +130,7 @@ function validateRubyEngineAndVersion(platform, engineVersions, engine, parsedVe
     } else {
       throw new Error(`Unknown version ${parsedVersion} for ${engine} on ${platform}
         available versions for ${engine} on ${platform}: ${engineVersions.join(', ')}
+        Make sure you use the latest version of the action with - uses: ruby/setup-ruby@v1
         File an issue at https://github.com/ruby/setup-ruby/issues if would like support for a new version`)
     }
   }
